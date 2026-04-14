@@ -1,4 +1,4 @@
-# Smart Route Optimizer for Courier Delivery
+# Pakivation - AI Route Optimizer
 
 A Python application that optimizes delivery routes using Genetic Algorithms and visualizes them using OpenStreetMap.
 
