@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pakivation Route Planner</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <style>
+        :root {
+            --bg-glass: rgba(18, 20, 24, 0.75);
+            --border-glass: rgba(255, 255, 255, 0.1);
+            --text-main: #f8f9fa;
+            --text-muted: #a0aec0;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+            --btn-grad: linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%);
+            --btn-grad-hover: linear-gradient(135deg, #2563eb 0%, #14b8a6 100%);
+            --danger-btn: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+            --danger-btn-hover: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            background-color: #0f172a;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .floating-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 360px;
+            max-height: calc(100vh - 40px);
+            z-index: 1000;
+            background: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            color: var(--text-main);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        .floating-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        .floating-panel::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: var(--btn-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .instructions ol {
+            padding-left: 20px;
+            margin-top: 8px;
+        }
+
+        .instructions li::marker {
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        .buttons-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        button {
+            flex: 1;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-clear {
+            background: var(--danger-btn);
+            flex: 0.4;
+        }
+
+        .btn-clear:hover {
+            background: var(--danger-btn-hover);
+        }
+
+        .btn-optimize {
+            background: var(--btn-grad);
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        .btn-optimize:hover {
+            background: var(--btn-grad-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px var(--accent-glow);
+        }
+
+        .btn-optimize:active {
+            transform: translateY(1px);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .points-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-glass);
+            padding-bottom: 8px;
+        }
+
+        .point-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .point-icon {
+            font-size: 18px;
+        }
+
+        .point-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .point-type {
+            font-weight: 600;
+            color: white;
+        }
+
+        .point-coords {
+            color: var(--text-muted);
+            font-size: 11px;
+            font-family: monospace;
+            margin-top: 2px;
+        }
+        
+        .metric {
+            margin-top: 10px;
+            padding: 12px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            color: #60a5fa;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+    
+    <div id="map"></div>
+
+    <div class="floating-panel">
+        <h1>Pakivation</h1>
+        <p class="subtitle">Deploy your fleet with genetically optimized delivery routes across the city.</p>
+        
+        <div class="instructions">
+            <strong>How it works:</strong>
+            <ol>
+                <li>Click map to set the <strong>Start Point</strong> 🚗</li>
+                <li>Click map to add <strong>Distinations</strong> 📦</li>
+                <li>Hit optimize to run the <em>Genetic Algorithm</em>.</li>
+            </ol>
+        </div>
+
+        <div class="buttons-group">
+            <button class="btn-clear" onclick="clearRoute()">Reset</button>
+            <button class="btn-optimize" id="optimizeBtn" onclick="optimizeRoute()">
+                <div class="spinner" id="btnSpinner"></div>
+                <span id="btnText">Optimize Route</span>
+            </button>
+        </div>
+        
+        <div id="resultsMetric" style="display: none;"></div>
+
+        <div class="points-section">
+            <h3>Waypoints</h3>
+            <div id="pointList">
+                <div style="color: var(--text-muted); font-size: 13px; font-style: italic; text-align: center; margin-top: 20px;">
+                    No waypoints selected.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use a sleek dark tile theme for the map
+        var map = L.map('map', { zoomControl: false }).setView([33.6844, 73.0479], 12);
+        
+        // CartoDB Dark Matter tiles
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors © CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // Move zoom control to bottom right
+        L.control.zoom({
+            position: 'bottomright'
+        }).addTo(map);
+
+        var startMarker = null;
+        var deliveryMarkers = [];
+        var selectedPoints = [];
+        var routeLine = null;
+
+        map.on('click', function(e) {
+            if (!startMarker) {
+                startMarker = L.marker(e.latlng, {
+                    icon: L.divIcon({ className: '', html: '<div style="font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); transform: translate(-12px, -12px); ">🚗</div>' })
+                }).addTo(map);
+                selectedPoints.push({ type: 'start', lat: e.latlng.lat, lng: e.latlng.lng });
+            } else {
+                var marker = L.marker(e.latlng, {
+                    icon: L.divIcon({ className: '', html: '<div style="font-size: 20px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); transform: translate(-10px, -10px); ">📦</div>' })
+                }).addTo(map);
+                deliveryMarkers.push(marker);
+                selectedPoints.push({ type: 'delivery', lat: e.latlng.lat, lng: e.latlng.lng });
+            }
+            updatePointList();
+            
+            // clear the drawn line if a new point is added so they have to re-optimize
+            if (routeLine) {
+                map.removeLayer(routeLine);
+                routeLine = null;
+                document.getElementById('resultsMetric').style.display = 'none';
+            }
+        });
+
+        function updatePointList() {
+            var list = document.getElementById('pointList');
+            if (selectedPoints.length === 0) {
+                list.innerHTML = `<div style="color: var(--text-muted); font-size: 13px; font-style: italic; text-align: center; margin-top: 20px;">No waypoints selected.</div>`;
+                return;
+            }
+            
+            list.innerHTML = '';
+            selectedPoints.forEach((point, index) => {
+                var div = document.createElement('div');
+                div.className = 'point-item';
+                div.innerHTML = `
+                    <div class="point-icon">${point.type === 'start' ? '🚗' : '📦'}</div>
+                    <div class="point-details">
+                        <span class="point-type">${index === 0 ? 'Origin' : 'Stop ' + index}</span>
+                        <span class="point-coords">${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}</span>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+            list.scrollTo(0, list.scrollHeight);
+        }
+
+        function clearRoute() {
+            if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+            deliveryMarkers.forEach(marker => map.removeLayer(marker));
+            deliveryMarkers = [];
+            selectedPoints = [];
+            
+            if (routeLine) {
+                map.removeLayer(routeLine);
+                routeLine = null;
+            }
+            document.getElementById('resultsMetric').style.display = 'none';
+            updatePointList();
+        }
+
+        function optimizeRoute() {
+            if (selectedPoints.length < 2) {
+                alert('Please select at least one delivery destination.');
+                return;
+            }
+
+            // Set loading state
+            const btnSpinner = document.getElementById('btnSpinner');
+            const btnText = document.getElementById('btnText');
+            const btn = document.getElementById('optimizeBtn');
+            const metric = document.getElementById('resultsMetric');
+            
+            btn.style.pointerEvents = 'none';
+            btnSpinner.style.display = 'block';
+            btnText.innerText = 'Calculating Genomes...';
+            metric.style.display = 'none';
+
+            fetch('/optimize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ points: selectedPoints })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remove existing route line if any
+                if (routeLine) map.removeLayer(routeLine);
+                
+                if(data.error) {
+                    alert('Optimization failed: ' + data.error);
+                    return;
+                }
+
+                // Draw the new optimized route
+                const routeCoords = data.optimized_coords;
+                routeLine = L.polyline(routeCoords, {
+                    color: '#3b82f6',
+                    weight: 4,
+                    opacity: 0.8,
+                    dashArray: '10, 10',
+                    lineCap: 'round'
+                }).addTo(map);
+
+                // Add an animated glow line underneath
+                L.polyline(routeCoords, {
+                    color: '#2dd4bf',
+                    weight: 8,
+                    opacity: 0.3,
+                    lineCap: 'round'
+                }).addTo(map);
+
+                // Zoom map to fit the route
+                map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+
+                // Show distance metric
+                if (data.distance) {
+                    metric.innerText = `✨ Optimized Distance: ${data.distance} km`;
+                    metric.style.display = 'block';
+                }
+
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error optimizing route!');
+            })
+            .finally(() => {
+                // Revert loading state
+                btn.style.pointerEvents = 'auto';
+                btnSpinner.style.display = 'none';
+                btnText.innerText = 'Optimize Route';
+            });
+        }
+    </script>
+</body>
+</html>
